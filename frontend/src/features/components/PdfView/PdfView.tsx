@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Document, Page } from 'react-pdf';
+import React, { useEffect, useState } from 'react';
+import { Document, Page, pdfjs } from 'react-pdf';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,12 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import axiosApi from '@/axiosApi';
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
 
 interface PDFViewerProps {
   isOpen: boolean;
@@ -22,17 +28,22 @@ interface PDFViewerProps {
 const PDFViewer: React.FC<PDFViewerProps> = ({ isOpen, onClose, file }) => {
   const [numPages, setNumPages] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
-
-  const fileUrl = useMemo(() => {
-    if (file?.blob) return URL.createObjectURL(file.blob);
-    if (file?.url) return file.url;
-    return null;
-  }, [file]);
+  const [pdf, setPdf] = useState(null);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setPageNumber(1);
   };
+
+
+
+  useEffect(() => {
+    const fetch = axiosApi.get('files/83/download', {responseType: 'blob' as const});
+    fetch.then((res) => {
+      console.log(res.data);
+      setPdf(res.data);
+    });
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -40,10 +51,10 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ isOpen, onClose, file }) => {
         <DialogHeader>
           <DialogTitle>{file?.name}</DialogTitle>
         </DialogHeader>
-        {fileUrl && (
+        {pdf && (
           <>
             <Document
-              file={fileUrl}
+              file={pdf}
               onLoadSuccess={onDocumentLoadSuccess}
               className="max-h-[70vh] overflow-auto"
             >
