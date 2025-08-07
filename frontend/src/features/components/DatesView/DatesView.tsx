@@ -6,15 +6,48 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { fetchFiles } from '@/features/components/FileView/filesThunks';
 import { selectFiles } from '@/features/components/FileView/filesSlice';
 import type { FileEntity } from '@/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import PDFViewer from '../PdfView/PdfView';
+import axiosApi from '@/axiosApi';
+import { toast } from 'react-toastify';
 
 const DatesView = () => {
   const dispatch = useAppDispatch();
   const files = useAppSelector(selectFiles);
+
   const [selectedFile, setSelectedFile] = useState<
     (FileEntity & { path: string }) | null
   >(null);
+
+  const handleFileClick = useCallback(async (file: FileEntity) => {
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+
+    if (isPdf) {
+      setSelectedFile({
+        ...file,
+        path: `/files/${file.id}/download`,
+      });
+    } else {
+      try {
+        const res = await axiosApi.get(`/files/${file.id}/download`, {
+          responseType: 'blob',
+        });
+        const blob = new Blob([res.data]);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch {
+        toast.error('Ошибка при скачивании файла');
+      }
+    }
+  }, []);
+
+  const clearSelectedFile = useCallback(() => setSelectedFile(null), []);
 
   useEffect(() => {
     dispatch(fetchFiles());
@@ -64,12 +97,7 @@ const DatesView = () => {
                     {files.map((file) => (
                       <div
                         key={file.id}
-                        onClick={() =>
-                          setSelectedFile({
-                            ...file,
-                            path: `/files/${file.id}`,
-                          })
-                        }
+                        onClick={() => handleFileClick(file)}
                         className="flex items-center gap-3 p-2 rounded hover:bg-muted transition-colors cursor-pointer"
                       >
                         <FileText className="text-muted-foreground" />
@@ -92,18 +120,13 @@ const DatesView = () => {
         </CardContent>
       </Card>
 
-      <PDFViewer
-        isOpen={!!selectedFile}
-        onClose={() => setSelectedFile(null)}
-        file={
-          selectedFile
-            ? {
-                name: selectedFile.name,
-                url: selectedFile.path,
-              }
-            : null
-        }
-      />
+      {selectedFile && (
+        <PDFViewer
+          isOpen={!!selectedFile}
+          onClose={clearSelectedFile}
+          file={selectedFile}
+        />
+      )}
     </div>
   );
 };

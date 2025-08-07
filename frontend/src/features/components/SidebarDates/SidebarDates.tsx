@@ -1,20 +1,21 @@
-import { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import PDFViewer from '../PdfView/PdfView';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { selectFiles } from '@/features/components/FileView/filesSlice';
-import type { FileEntity } from '@/types';
 import { fetchFiles } from '@/features/components/FileView/filesThunks';
 import getFileBadge from '@/components/fileIcons/FileIcons';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import axiosApi from '@/axiosApi';
+import type { FileEntity } from '@/types';
 
 const SidebarDates = () => {
   const dispatch = useAppDispatch();
   const files = useAppSelector(selectFiles);
   const [selectedFile, setSelectedFile] = useState<FileEntity | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     dispatch(fetchFiles());
   }, [dispatch]);
 
@@ -35,6 +36,35 @@ const SidebarDates = () => {
     {},
   );
 
+  const downloadFile = async (file: FileEntity) => {
+    try {
+      const response = await axiosApi.get(`/files/${file.id}/download`, {
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка при скачивании файла:', error);
+    }
+  };
+
+  const handleFileClick = (file: FileEntity) => {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+
+    if (extension === 'pdf') {
+      setSelectedFile(file);
+    } else {
+      void downloadFile(file);
+    }
+  };
+
   return (
     <>
       <div className="w-64 p-2 space-y-3">
@@ -47,7 +77,7 @@ const SidebarDates = () => {
               {files.map((file) => (
                 <Card
                   key={file.id}
-                  onClick={() => setSelectedFile(file)}
+                  onClick={() => handleFileClick(file)}
                   className="hover:bg-accent/50 transition-colors border-0 shadow-none cursor-pointer"
                 >
                   <CardContent className="p-2 flex items-center gap-2">
@@ -75,14 +105,7 @@ const SidebarDates = () => {
       <PDFViewer
         isOpen={!!selectedFile}
         onClose={() => setSelectedFile(null)}
-        file={
-          selectedFile
-            ? {
-                name: selectedFile.name,
-                url: selectedFile.path,
-              }
-            : null
-        }
+        file={selectedFile}
       />
     </>
   );

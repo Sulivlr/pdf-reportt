@@ -6,8 +6,13 @@ const drawerWidth = 299;
 
 const TopBar = () => {
   const navigate = useNavigate();
+
   const handleCreateFolder = (folderId: number) => {
     navigate(`/folders/${folderId}`);
+  };
+
+  const handleTitleClick = () => {
+    navigate('/');
   };
 
   return (
@@ -20,7 +25,13 @@ const TopBar = () => {
         )}
         style={{ width: `calc(100% - ${drawerWidth}px)` }}
       >
-        <h1 className="text-lg text-white font-semibold">PDF Платформа</h1>
+        <h1
+          onClick={handleTitleClick}
+          className="text-lg text-white font-semibold cursor-pointer select-none"
+          title="На главную"
+        >
+          PDF Платформа
+        </h1>
         <NewFolder onSubmit={handleCreateFolder} />
       </div>
     </>

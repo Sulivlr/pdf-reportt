@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import axiosApi from '@/axiosApi';
+import type { FileEntity } from '@/types';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -18,43 +19,66 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 interface PDFViewerProps {
   isOpen: boolean;
   onClose: () => void;
-  file: {
-    name: string;
-    blob?: Blob;
-    url?: string;
-  } | null;
+  file: FileEntity | null;
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ isOpen, onClose, file }) => {
   const [numPages, setNumPages] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
-  const [pdf, setPdf] = useState(null);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setPageNumber(1);
   };
 
+  const fetchPdfBlob = useCallback(async (fileId: string | undefined) => {
+    if (!fileId) {
+      setPdfBlob(null);
+      return;
+    }
 
+    try {
+      const res = await axiosApi.get(`/files/${fileId}/download`, { responseType: 'blob' });
+      setPdfBlob(res.data);
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetch = axiosApi.get('files/83/download', {responseType: 'blob' as const});
-    fetch.then((res) => {
-      console.log(res.data);
-      setPdf(res.data);
-    });
-  }, []);
+    void fetchPdfBlob(file?.id?.toString());
+  }, [file?.id, fetchPdfBlob]);
+
+
+  const createPdfUrl = useCallback(() => {
+    if (!pdfBlob) {
+      setPdfUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(pdfBlob);
+    setPdfUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+      setPdfUrl(null);
+    };
+  }, [pdfBlob]);
+
+  useEffect(() => {
+    return createPdfUrl();
+  }, [createPdfUrl]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-full">
-        <DialogHeader>
+      <DialogContent style={{ maxWidth: '700px', width: '100%' }}>
+      <DialogHeader>
           <DialogTitle>{file?.name}</DialogTitle>
         </DialogHeader>
-        {pdf && (
+        {pdfUrl && (
           <>
             <Document
-              file={pdf}
+              file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccess}
               className="max-h-[70vh] overflow-auto"
             >

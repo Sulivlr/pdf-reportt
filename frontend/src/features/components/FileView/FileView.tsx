@@ -1,10 +1,10 @@
+import React, { type FormEvent, useEffect, useState, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { FileText, Loader2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { cn } from '@/lib/utils';
-import React, { type FormEvent, useEffect, useState } from 'react';
 import { selectFiles } from './filesSlice';
 import { fetchFiles, createFile } from './filesThunks';
 import {
@@ -18,6 +18,36 @@ import FileInput from '../../UI/FileInput/FileInput';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
 import PDFViewer from '@/features/components/PdfView/PdfView';
+import axiosApi from '@/axiosApi';
+
+interface FileRowProps {
+  file: FileEntity;
+  onClick: (file: FileEntity) => void;
+  showSeparator: boolean;
+}
+
+const FileRow: React.FC<FileRowProps> = ({ file, onClick, showSeparator }) => (
+  <>
+    {showSeparator && <Separator />}
+    <div
+      className={cn(
+        'flex justify-between items-center py-3 px-2',
+        'hover:bg-muted rounded-md transition-colors cursor-pointer',
+      )}
+      onClick={() => onClick(file)}
+    >
+      <div className="flex items-center gap-3">
+        <FileText className="text-muted-foreground" />
+        <div>
+          <div className="font-medium">{file.name}</div>
+          <div className="text-sm text-muted-foreground">
+            Создано: {new Date(file.uploadedAt).toLocaleDateString('ru-RU')}
+          </div>
+        </div>
+      </div>
+    </div>
+  </>
+);
 
 const FolderContent = () => {
   const dispatch = useAppDispatch();
@@ -82,6 +112,30 @@ const FolderContent = () => {
     }
   };
 
+  const handleFileClick = useCallback(async (file: FileEntity) => {
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    if (isPdf) {
+      setSelectedFile(file);
+    } else {
+      try {
+        const res = await axiosApi.get(`/files/${file.id}/download`, {
+          responseType: 'blob',
+        });
+        const blob = new Blob([res.data]);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        toast.error('Ошибка при скачивании файла');
+      }
+    }
+  }, []);
+
   return (
     <>
       <Card className="w-full max-w-4xl mx-auto mt-10 shadow-2xl">
@@ -125,29 +179,12 @@ const FolderContent = () => {
                 </div>
               ) : filteredFiles.length > 0 ? (
                 filteredFiles.map((file, index) => (
-                  <div key={file.id}>
-                    {index !== 0 && <Separator />}
-                    <div
-                      className={cn(
-                        'flex justify-between items-center py-3 px-2',
-                        'hover:bg-muted rounded-md transition-colors cursor-pointer',
-                      )}
-                      onClick={() => setSelectedFile(file)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="text-muted-foreground" />
-                        <div>
-                          <div className="font-medium">{file.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Создано:{' '}
-                            {new Date(file.uploadedAt).toLocaleDateString(
-                              'ru-RU',
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <FileRow
+                    key={file.id}
+                    file={file}
+                    onClick={handleFileClick}
+                    showSeparator={index !== 0}
+                  />
                 ))
               ) : (
                 <div className="text-center text-muted-foreground py-4">
@@ -157,17 +194,11 @@ const FolderContent = () => {
             </div>
           </ScrollArea>
         </CardContent>
+
         <PDFViewer
           isOpen={!!selectedFile}
           onClose={() => setSelectedFile(null)}
-          file={
-            selectedFile
-              ? {
-                  name: selectedFile.name,
-                  url: selectedFile.path,
-                }
-              : null
-          }
+          file={selectedFile}
         />
       </Card>
     </>

@@ -3,12 +3,14 @@ import Layout from '../src/features/UI/Layout/Layout';
 import { Route } from 'react-router';
 import DatesView from './features/components/DatesView/DatesView';
 import FolderContent from './features/components/FileView/FileView';
+import Home from '@/features/components/Home/Home';
 
 function App() {
   return (
     <>
       <Layout>
         <Routes>
+          <Route path="/" element={<Home/>} />
           <Route path="/folders" element={<FolderContent />} />
           <Route path="/date" element={<DatesView />} />
           <Route path="/folders/:folderId" element={<FolderContent />} />
